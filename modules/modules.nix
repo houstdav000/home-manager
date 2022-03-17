@@ -130,6 +130,7 @@ let
     ./programs/pidgin.nix
     ./programs/piston-cli.nix
     ./programs/powerline-go.nix
+    ./programs/powershell.nix
     ./programs/pubs.nix
     ./programs/qutebrowser.nix
     ./programs/rbw.nix

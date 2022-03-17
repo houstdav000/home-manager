@@ -89,6 +89,14 @@ in {
         Whether to enable Ion integration.
       '';
     };
+
+    enablePowerShellIntegration = mkOption {
+      default = true;
+      type = types.bool;
+      description = ''
+        Whether to enable PowerShell integration.
+      '';
+    };
   };
 
   config = mkIf cfg.enable {
@@ -120,6 +128,12 @@ in {
       if test $TERM != "dumb" && not exists -s INSIDE_EMACS || test $INSIDE_EMACS = "vterm"
         eval $(${starshipCmd} init ion)
       end
+    '';
+
+    programs.powershell.initExtra = mkIf cfg.enablePowerShellIntegration ''
+    if ($env:TERM -ne 'dumb' -and ($null -eq $env:INSIDE_EMACS -or $env:INSIDE_EMACS -eq 'vterm')) {
+      Invoke-Expression (&starship init powershell)
+    }
     '';
   };
 }
