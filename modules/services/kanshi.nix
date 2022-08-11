@@ -83,15 +83,26 @@ let
           Sets the output transform.
         '';
       };
+
+      adaptiveSync = mkOption {
+        type = types.nullOr (types.enum [ "on" "off" ]);
+        default = null;
+        example = "on";
+        description = ''
+          Turns on or off the <literal>adaptive_sync</literal> option
+          for outputs that support FreeSync and/or G-Sync.
+        '';
+      };
     };
   };
 
-  outputStr = { criteria, status, mode, position, scale, transform, ... }:
+  outputStr = { criteria, status, mode, position, scale, transform, adaptiveSync, ... }:
     ''output "${criteria}"'' + optionalString (status != null) " ${status}"
     + optionalString (mode != null) " mode ${mode}"
     + optionalString (position != null) " position ${position}"
     + optionalString (scale != null) " scale ${toString scale}"
-    + optionalString (transform != null) " transform ${transform}";
+    + optionalString (transform != null) " transform ${transform}"
+    + optionalString (adaptiveSync != null) " adaptive_sync ${adaptiveSync}";
 
   profileModule = types.submodule {
     options = {
