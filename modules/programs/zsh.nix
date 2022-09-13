@@ -29,8 +29,14 @@ let
   zdotdir = "$HOME/" + cfg.dotDir;
 
   bindkeyCommands = {
-    emacs = "bindkey -e";
-    viins = "bindkey -v";
+    emacs = ''
+      bindkey -e
+      bindkey -A emacs main
+    '';
+    viins = ''
+      bindkey -v
+      bindkey -A viins main
+    '';
     vicmd = "bindkey -a";
   };
 
