@@ -3,26 +3,18 @@
 with lib;
 
 let
-
   cfg = config.programs.zsh;
 
-  relToDotDir = file: (optionalString (cfg.dotDir != null) (cfg.dotDir + "/")) + file;
+  concatLines = lib.concatLines or concatStringsSep "\n";
+  mapListToAttrs' = f: list: listToAttrs (map f list);
 
-  pluginsDir = if cfg.dotDir != null then
-    relToDotDir "plugins" else ".zsh/plugins";
+  relToDotDir = file: "${optionalString (cfg.dotDir != null) "${cfg.dotDir}/"}${file}";
 
-  envVarsStr = config.lib.zsh.exportAll cfg.sessionVariables;
-  localVarsStr = config.lib.zsh.defineAll cfg.localVariables;
+  # pluginsDir = if cfg.dotDir != null then
+  #   relToDotDir "plugins" else ".zsh/plugins";
+  pluginsDir = "${cfg.dotDir or ".zsh"}/plugins";
 
-  aliasesStr = concatStringsSep "\n" (
-    mapAttrsToList (k: v: "alias ${k}=${lib.escapeShellArg v}") cfg.shellAliases
-  );
-
-  dirHashesStr = concatStringsSep "\n" (
-    mapAttrsToList (k: v: ''hash -d ${k}="${v}"'') cfg.dirHashes
-  );
-
-  zdotdir = "$HOME/" + cfg.dotDir;
+  zdotdir = "$HOME/${cfg.dotDir}";
 
   bindkeyCommands = {
     emacs = "bindkey -e";
@@ -35,16 +27,20 @@ let
   historyModule = types.submodule ({ config, ... }: {
     options = {
       size = mkOption {
-        type = types.int;
+        type = types.ints.unsigned;
         default = 10000;
-        description = "Number of history lines to keep.";
+        description = ''
+          Number of history lines to keep.
+        '';
       };
 
       save = mkOption {
-        type = types.int;
+        type = types.ints.unsigned;
         defaultText = 10000;
-        default = config.size;
-        description = "Number of history lines to save.";
+        default = config.size or 10000;
+        description = ''
+          Number of history lines to save.
+        '';
       };
 
       path = mkOption {
@@ -57,12 +53,14 @@ let
           "$ZDOTDIR/.zsh_history" otherwise
         '';
         example = literalExpression ''"''${config.xdg.dataHome}/zsh/zsh_history"'';
-        description = "History file location";
+        description = ''
+          History file location
+        '';
       };
 
       ignorePatterns = mkOption {
         type = types.listOf types.str;
-        default = [];
+        default = [ ];
         example = literalExpression ''[ "rm *" "pkill *" ]'';
         description = ''
           Do not enter command lines into the history list
@@ -91,19 +89,25 @@ let
       expireDuplicatesFirst = mkOption {
         type = types.bool;
         default = false;
-        description = "Expire duplicates first.";
+        description = ''
+          Expire duplicates first.
+        '';
       };
 
       extended = mkOption {
         type = types.bool;
         default = false;
-        description = "Save timestamp into the history file.";
+        description = ''
+          Save timestamp into the history file.
+        '';
       };
 
       share = mkOption {
         type = types.bool;
         default = true;
-        description = "Share command history between zsh sessions.";
+        description = ''
+          Share command history between zsh sessions.
+        '';
       };
     };
   });
@@ -142,8 +146,10 @@ let
     options = {
       enable = mkEnableOption "oh-my-zsh";
 
+      package = mkPackageOption pkgs "oh-my-zsh" { };
+
       plugins = mkOption {
-        default = [];
+        default = [ ];
         example = [ "git" "sudo" ];
         type = types.listOf types.str;
         description = ''
@@ -187,6 +193,9 @@ let
   historySubstringSearchModule = types.submodule {
     options = {
       enable = mkEnableOption "history substring search";
+
+      package = mkPackageOption pkgs "zsh-history-substring-search" { };
+
       searchUpKey = mkOption {
         type = types.str;
         default = "^[[A";
@@ -195,6 +204,7 @@ let
           The default of <literal>^[[A</literal> corresponds to the UP key.
         '';
       };
+
       searchDownKey = mkOption {
         type = types.str;
         default = "^[[B";
@@ -205,31 +215,31 @@ let
       };
     };
   };
-
-in
-
-{
+in {
   options = {
     programs.zsh = {
       enable = mkEnableOption "Z shell (Zsh)";
 
+      package = mkPackageOption pkgs "zsh" { };
+
       autocd = mkOption {
+        type = with types; nullOr str;
         default = null;
         description = ''
           Automatically enter into a directory if typed directly into shell.
         '';
-        type = types.nullOr types.bool;
       };
 
       cdpath = mkOption {
-        default = [];
+        type = with types; listOf str;
+        default = [ ];
         description = ''
           List of paths to autocomplete calls to `cd`.
         '';
-        type = types.listOf types.str;
       };
 
       dotDir = mkOption {
+        type = with types; nullOr str;
         default = null;
         example = ".config/zsh";
         description = ''
@@ -237,11 +247,11 @@ in
           relative to the users home directory. The default is the home
           directory.
         '';
-        type = types.nullOr types.str;
       };
 
       shellAliases = mkOption {
-        default = {};
+        type = with types; attrsOf str;
+        default = { };
         example = literalExpression ''
           {
             ll = "ls -l";
@@ -252,11 +262,11 @@ in
           An attribute set that maps aliases (the top level attribute names in
           this option) to command strings or directly to build outputs.
         '';
-        type = types.attrsOf types.str;
       };
 
       shellGlobalAliases = mkOption {
-        default = {};
+        type = with types; attrsOf str;
+        default = { };
         example = literalExpression ''
           {
             UUID = "$(uuidgen | tr -d \\n)";
@@ -267,11 +277,11 @@ in
           Similar to <xref linkend="opt-programs.zsh.shellAliases"/>,
           but are substituted anywhere on a line.
         '';
-        type = types.attrsOf types.str;
       };
 
       dirHashes = mkOption {
-        default = {};
+        type = with types; attrsOf str;
+        default = { };
         example = literalExpression ''
           {
             docs  = "$HOME/Documents";
@@ -282,108 +292,133 @@ in
         description = ''
           An attribute set that adds to named directory hash table.
         '';
-        type = types.attrsOf types.str;
       };
 
-      enableCompletion = mkOption {
-        default = true;
-        description = ''
+      completions = {
+        enable = mkEnableOption ''
           Enable zsh completion. Don't forget to add
           <programlisting language="nix">
             environment.pathsToLink = [ "/share/zsh" ];
           </programlisting>
           to your system configuration to get completion for system packages (e.g. systemd).
-        '';
-        type = types.bool;
+          '' // { default = true; };
+
+        package = mkPackageOption pkgs "zsh-completions" { };
+
+        initCmd = mkOption {
+          type = types.lines;
+          default = "autoload -U compinit && compinit";
+          description = ''
+            Initialization commands to run when completion is enabled.
+          '';
+        };
       };
 
-      completionInit = mkOption {
-        default = "autoload -U compinit && compinit";
-        description = "Initialization commands to run when completion is enabled.";
-        type = types.lines;
+
+      autosuggestions = {
+        enable = mkEnableOption "Zsh Autosuggestions";
+
+        package = mkPackageOption pkgs "zsh-autosuggestions" { };
       };
 
-      enableAutosuggestions = mkOption {
-        default = false;
-        description = "Enable zsh autosuggestions";
-      };
-
-      enableSyntaxHighlighting = mkOption {
-        default = false;
-        description = "Enable zsh syntax highlighting";
+      syntaxHighlighting = {
+        enable = mkEnableOption "Zsh syntax highlighting";
+        package = mkPackageOption pkgs "zsh-syntax-highlighting";
       };
 
       historySubstringSearch = mkOption {
         type = historySubstringSearchModule;
-        default = {};
-        description = "Options related to zsh-history-substring-search.";
+        default = { };
+        description = ''
+          Options related to zsh-history-substring-search.
+        '';
       };
 
       history = mkOption {
         type = historyModule;
-        default = {};
-        description = "Options related to commands history configuration.";
+        default = { };
+        description = ''
+          Options related to commands history configuration.
+        '';
       };
 
       defaultKeymap = mkOption {
         type = types.nullOr (types.enum (attrNames bindkeyCommands));
         default = null;
         example = "emacs";
-        description = "The default base keymap to use.";
+        description = ''
+          The default base keymap to use.
+        '';
       };
 
       sessionVariables = mkOption {
-        default = {};
         type = types.attrs;
+        default = { };
         example = { MAILCHECK = 30; };
-        description = "Environment variables that will be set for zsh session.";
+        description = ''
+          Environment variables that will be set for zsh session.
+        '';
       };
 
       initExtraBeforeCompInit = mkOption {
-        default = "";
         type = types.lines;
-        description = "Extra commands that should be added to <filename>.zshrc</filename> before compinit.";
+        default = "";
+        description = ''
+          Extra commands that should be added to <filename>.zshrc</filename> before compinit.
+        '';
       };
 
       initExtra = mkOption {
-        default = "";
         type = types.lines;
-        description = "Extra commands that should be added to <filename>.zshrc</filename>.";
+        default = "";
+        description = ''
+          Extra commands that should be added to <filename>.zshrc</filename>.
+        '';
       };
 
       initExtraFirst = mkOption {
-        default = "";
         type = types.lines;
-        description = "Commands that should be added to top of <filename>.zshrc</filename>.";
+        default = "";
+        description = ''
+          Commands that should be added to top of <filename>.zshrc</filename>.
+        '';
       };
 
       envExtra = mkOption {
-        default = "";
         type = types.lines;
-        description = "Extra commands that should be added to <filename>.zshenv</filename>.";
+        default = "";
+        description = ''
+          Extra commands that should be added to <filename>.zshenv</filename>.
+        '';
       };
 
       profileExtra = mkOption {
-        default = "";
         type = types.lines;
-        description = "Extra commands that should be added to <filename>.zprofile</filename>.";
+        default = "";
+        description = ''
+          Extra commands that should be added to <filename>.zprofile</filename>.
+        '';
       };
 
       loginExtra = mkOption {
-        default = "";
         type = types.lines;
-        description = "Extra commands that should be added to <filename>.zlogin</filename>.";
+        default = "";
+        description = ''
+          Extra commands that should be added to <filename>.zlogin</filename>.
+        '';
       };
 
       logoutExtra = mkOption {
-        default = "";
         type = types.lines;
-        description = "Extra commands that should be added to <filename>.zlogout</filename>.";
+        default = "";
+        description = ''
+          Extra commands that should be added to <filename>.zlogout</filename>.
+        '';
       };
 
       plugins = mkOption {
         type = types.listOf pluginModule;
-        default = [];
+        default = [ ];
         example = literalExpression ''
           [
             {
@@ -408,18 +443,22 @@ in
             }
           ]
         '';
-        description = "Plugins to source in <filename>.zshrc</filename>.";
+        description = ''
+          Plugins to source in <filename>.zshrc</filename>.
+        '';
       };
 
       oh-my-zsh = mkOption {
         type = ohMyZshModule;
-        default = {};
-        description = "Options to configure oh-my-zsh.";
+        default = { };
+        description = ''
+          Options to configure oh-my-zsh.
+        '';
       };
 
       localVariables = mkOption {
         type = types.attrs;
-        default = {};
+        default = { };
         example = { POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=["dir" "vcs"]; };
         description = ''
           Extra local variables defined at the top of <filename>.zshrc</filename>.
@@ -429,10 +468,6 @@ in
   };
 
   config = mkIf cfg.enable (mkMerge [
-    (mkIf (cfg.envExtra != "") {
-      home.file."${relToDotDir ".zshenv"}".text = cfg.envExtra;
-    })
-
     (mkIf (cfg.profileExtra != "") {
       home.file."${relToDotDir ".zprofile"}".text = cfg.profileExtra;
     })
@@ -445,18 +480,7 @@ in
       home.file."${relToDotDir ".zlogout"}".text = cfg.logoutExtra;
     })
 
-    (mkIf cfg.oh-my-zsh.enable {
-      home.file."${relToDotDir ".zshenv"}".text = ''
-        ZSH="${pkgs.oh-my-zsh}/share/oh-my-zsh";
-        ZSH_CACHE_DIR="${config.xdg.cacheHome}/oh-my-zsh";
-      '';
-    })
-
     (mkIf (cfg.dotDir != null) {
-      home.file."${relToDotDir ".zshenv"}".text = ''
-        ZDOTDIR=${zdotdir}
-      '';
-
       # When dotDir is set, only use ~/.zshenv to source ZDOTDIR/.zshenv,
       # This is so that if ZDOTDIR happens to be
       # already set correctly (by e.g. spawning a zsh inside a zsh), all env
@@ -467,6 +491,10 @@ in
     })
 
     {
+      home.packages = [ cfg.package ]
+        ++ optional cfg.completions.enable cfg.completions.package
+        ++ optional cfg.oh-my-zsh.enable cfg.oh-my-zsh.package;
+
       home.file."${relToDotDir ".zshenv"}".text = ''
         # Environment variables
         . "${config.home.profileDirectory}/etc/profile.d/hm-session-vars.sh"
@@ -474,62 +502,73 @@ in
         # Only source this once
         if [[ -z "$__HM_ZSH_SESS_VARS_SOURCED" ]]; then
           export __HM_ZSH_SESS_VARS_SOURCED=1
-          ${envVarsStr}
+          ${config.lib.zsh.exportAll cfg.sessionVariables}
         fi
+
+        ${optionalString cfg.oh-my-zsh.enable ''
+          ZSH="${cfg.oh-my-zsh.package}/share/oh-my-zsh";
+          ZSH_CACHE_DIR="${config.xdg.cacheHome or "$XDG_CACHE_HOME"}/oh-my-zsh";
+        ''}
+
+        ${optionalString (cfg.dotDir != null) "ZDOTDIR=${zdotdir}"}
+
+        ${cfg.envExtra}
       '';
-    }
 
-    {
-      home.packages = with pkgs; [ zsh ]
-        ++ optional cfg.enableCompletion nix-zsh-completions
-        ++ optional cfg.oh-my-zsh.enable oh-my-zsh;
-
-      home.file."${relToDotDir ".zshrc"}".text = concatStringsSep "\n" ([
-        cfg.initExtraFirst
-        "typeset -U path cdpath fpath manpath"
-
-        (optionalString (cfg.cdpath != []) ''
-          cdpath+=(${concatStringsSep " " cfg.cdpath})
-        '')
-
+      home.file."${relToDotDir ".zshrc"}".text =
+        let
+          mkSetOpt = arg: if arg then "setopt" else "unsetopt";
+        in
         ''
+        # Generated by home-manager
+
+        ${cfg.initExtraFirst}
+
+        typeset -U path cdpath fpath manpath
+
+        ${optionalString (cfg.cdpath != [ ]) "cdpath+=(${concatStringsSep " " cfg.cdpath})"}
+
         for profile in ''${(z)NIX_PROFILES}; do
-          fpath+=($profile/share/zsh/site-functions $profile/share/zsh/$ZSH_VERSION/functions $profile/share/zsh/vendor-completions)
+          fpath+=(
+            $profile/share/zsh/site-functions
+            $profile/share/zsh/$ZSH_VERSION/functions
+            $profile/share/zsh/vendor-completions
+          )
         done
 
-        HELPDIR="${pkgs.zsh}/share/zsh/$ZSH_VERSION/help"
-        ''
+        HELPDIR="${cfg.package}/share/zsh/$ZSH_VERSION/help"
 
-        (optionalString (cfg.defaultKeymap != null) ''
+        ${optionalString (cfg.defaultKeymap != null) ''
           # Use ${cfg.defaultKeymap} keymap as the default.
           ${getAttr cfg.defaultKeymap bindkeyCommands}
-        '')
-        localVarsStr
+        ''}
 
-        cfg.initExtraBeforeCompInit
+        ${config.lib.zsh.defineAll cfg.localVariables}
 
-        (concatStrings (map (plugin: ''
+        ${cfg.initExtraBeforeCompInit}
+
+        ${concatMapStrings (plugin: ''
           path+="$HOME/${pluginsDir}/${plugin.name}"
           fpath+="$HOME/${pluginsDir}/${plugin.name}"
-        '') cfg.plugins))
+        '') cfg.plugins}
 
-        ''
         # Oh-My-Zsh/Prezto calls compinit during initialization,
         # calling it twice causes slight start up slowdown
         # as all $fpath entries will be traversed again.
-        ${optionalString (cfg.enableCompletion && !cfg.oh-my-zsh.enable && !cfg.prezto.enable)
-          cfg.completionInit
+        ${optionalString (cfg.completions.enable && !cfg.oh-my-zsh.enable && !cfg.prezto.enable)
+          cfg.completions.initCmd
         }
 
-        ${optionalString cfg.enableAutosuggestions
-          "source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+        ${optionalString cfg.autosuggestions.enable
+          "source ${cfg.autosuggestions.package}/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
         }
 
         ${optionalString cfg.oh-my-zsh.enable ''
             # oh-my-zsh extra settings for plugins
             ${cfg.oh-my-zsh.extraConfig}
-            # oh-my-zsh configuration generated by NixOS
-            ${optionalString (cfg.oh-my-zsh.plugins != [])
+
+            # oh-my-zsh configuration generated by home-manager
+            ${optionalString (cfg.oh-my-zsh.plugins != [ ])
               "plugins=(${concatStringsSep " " cfg.oh-my-zsh.plugins})"
             }
             ${optionalString (cfg.oh-my-zsh.custom != "")
@@ -542,59 +581,60 @@ in
         ''}
 
         ${optionalString cfg.prezto.enable
-            (builtins.readFile "${pkgs.zsh-prezto}/share/zsh-prezto/runcoms/zshrc")}
+            (builtins.readFile "${cfg.prezto.package}/share/zsh-prezto/runcoms/zshrc")}
 
-        ${concatStrings (map (plugin: ''
+        ${concatMapStrings (plugin: ''
           if [[ -f "$HOME/${pluginsDir}/${plugin.name}/${plugin.file}" ]]; then
             source "$HOME/${pluginsDir}/${plugin.name}/${plugin.file}"
           fi
-        '') cfg.plugins)}
+        '') cfg.plugins}
 
         # History options should be set in .zshrc and after oh-my-zsh sourcing.
         # See https://github.com/nix-community/home-manager/issues/177.
         HISTSIZE="${toString cfg.history.size}"
         SAVEHIST="${toString cfg.history.save}"
-        ${optionalString (cfg.history.ignorePatterns != []) "HISTORY_IGNORE=${lib.escapeShellArg "(${lib.concatStringsSep "|" cfg.history.ignorePatterns})"}"}
-        ${if versionAtLeast config.home.stateVersion "20.03"
-          then ''HISTFILE="${cfg.history.path}"''
-          else ''HISTFILE="$HOME/${cfg.history.path}"''}
+
+        ${optionalString (cfg.history.ignorePatterns != [ ]) "HISTORY_IGNORE=${escapeShellArg "(${concatStringsSep "|" cfg.history.ignorePatterns})"}"}
+
+        HISTFILE="${optionalString (! versionAtLeast config.home.stateVersion "20.03") "$HOME/"}${cfg.history.path}
+
         mkdir -p "$(dirname "$HISTFILE")"
 
         setopt HIST_FCNTL_LOCK
-        ${if cfg.history.ignoreDups then "setopt" else "unsetopt"} HIST_IGNORE_DUPS
-        ${if cfg.history.ignoreSpace then "setopt" else "unsetopt"} HIST_IGNORE_SPACE
-        ${if cfg.history.expireDuplicatesFirst then "setopt" else "unsetopt"} HIST_EXPIRE_DUPS_FIRST
-        ${if cfg.history.share then "setopt" else "unsetopt"} SHARE_HISTORY
-        ${if cfg.history.extended then "setopt" else "unsetopt"} EXTENDED_HISTORY
-        ${if cfg.autocd != null then "${if cfg.autocd then "setopt" else "unsetopt"} autocd" else ""}
+        ${mkSetOpt cfg.history.ignoreDups} HIST_IGNORE_DUPS
+        ${mkSetOpt cfg.history.ignoreSpace} HIST_IGNORE_SPACE
+        ${mkSetOpt cfg.history.expireDuplicatesFirst} HIST_EXPIRE_DUPS_FIRST
+        ${mkSetOpt cfg.history.share} SHARE_HISTORY
+        ${mkSetOpt cfg.history.extended} EXTENDED_HISTORY
+        ${optionalString (cfg.autocd != null) "${mkSetOpt cfg.autocd} autocd"}
 
         ${cfg.initExtra}
 
         # Aliases
-        ${aliasesStr}
-        ''
-      ] 
-      ++ (mapAttrsToList (k: v: "alias -g ${k}=${lib.escapeShellArg v}") cfg.shellGlobalAliases) 
-      ++ [ (''
+        ${concatLines (mapAttrsToList (k: v: "alias ${k}=${escapeShellArg v}") cfg.shellAliases)}
+
+        # Global Aliases
+        ${concatLines (mapAttrsToList (k: v: "alias -g ${k}=${escapeShellArg v}") cfg.shellGlobalAliases)}
+
         # Named Directory Hashes
-        ${dirHashesStr}
-        '')
+        ${concatLines (mapAttrsToList (k: v: "hash -d ${k}=\"${v}\"") cfg.dirHashes)}
 
-        (optionalString cfg.enableSyntaxHighlighting
-          # Load zsh-syntax-highlighting after all custom widgets have been created
-          # https://github.com/zsh-users/zsh-syntax-highlighting#faq
-          "source ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
-        )
+        ${optionalString cfg.syntaxHighlighting.enable or false
+            # Load zsh-syntax-highlighting after all custom widgets have been created
+            # https://github.com/zsh-users/zsh-syntax-highlighting#faq
+            "source ${cfg.syntaxHighlighting.package}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+        }
 
-        (optionalString (cfg.historySubstringSearch.enable or false)
+        ${optionalString cfg.historySubstringSearch.enable or false
           # Load zsh-history-substring-search after zsh-syntax-highlighting
           # https://github.com/zsh-users/zsh-history-substring-search#usage
-        ''
-          source ${pkgs.zsh-history-substring-search}/share/zsh-history-substring-search/zsh-history-substring-search.zsh
-          bindkey '${cfg.historySubstringSearch.searchUpKey}' history-substring-search-up
-          bindkey '${cfg.historySubstringSearch.searchDownKey}' history-substring-search-down
-        '')
-      ]);
+          ''
+            source ${cfg.historySubstringSearch.package}/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+            bindkey '${cfg.historySubstringSearch.searchUpKey}' history-substring-search-up
+            bindkey '${cfg.historySubstringSearch.searchDownKey}' history-substring-search-down
+          ''
+        }
+      '';
     }
 
     (mkIf cfg.oh-my-zsh.enable {
@@ -603,15 +643,12 @@ in
       home.file."${config.xdg.cacheHome}/oh-my-zsh/.keep".text = "";
     })
 
-    (mkIf (cfg.plugins != []) {
+    (mkIf (cfg.plugins != [ ]) {
       # Many plugins require compinit to be called
       # but allow the user to opt out.
-      programs.zsh.enableCompletion = mkDefault true;
+      programs.zsh.completions.enable = mkDefault true;
 
-      home.file =
-        foldl' (a: b: a // b) {}
-        (map (plugin: { "${pluginsDir}/${plugin.name}".source = plugin.src; })
-        cfg.plugins);
+      home.file = mapListToAttrs' (plugin: nameValuePair "${pluginsDir}/${plugin.name}" { source = plugin.src; }) cfg.plugins;
     })
   ]);
 }
