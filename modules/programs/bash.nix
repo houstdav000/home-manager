@@ -29,6 +29,8 @@ in {
     programs.bash = {
       enable = mkEnableOption "GNU Bourne-Again SHell";
 
+      package = mkPackageOption pkgs "bash" { };
+
       enableCompletion = mkOption {
         type = types.bool;
         default = true;
@@ -192,6 +194,8 @@ in {
         HISTIGNORE = escapeShellArg (concatStringsSep ":" cfg.historyIgnore);
       }));
   in mkIf cfg.enable {
+    home.packages = [ cfg.package ];
+
     home.file.".bash_profile".source = writeBashScript "bash_profile" ''
       # include .profile if it exists
       [[ -f ~/.profile ]] && . ~/.profile
